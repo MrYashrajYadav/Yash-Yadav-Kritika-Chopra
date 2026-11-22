@@ -1,0 +1,380 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidStringArray(arr, maxLen) {
+      return arr is list &&
+        arr.size() <= maxLen &&
+        (arr.size() == 0 || (arr[0] is string && arr[0].size() >= 1 && arr[0].size() <= 128));
+    }
+
+    // Entity validation blueprints
+    function isValidPatientProfile(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'displayName', 'communicationStyle', 'preferredUnits',
+          'careSummary', 'learningCount', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId', 'displayName', 'communicationStyle', 'preferredUnits',
+          'careSummary', 'learningCount', 'createdAt', 'updatedAt'
+        ]) &&
+        data.userId is string && data.userId == userId && isValidId(data.userId) &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+        data.communicationStyle is string && data.communicationStyle in ['concise', 'detailed', 'plain_language', 'clinical'] &&
+        data.preferredUnits is string && data.preferredUnits in ['metric', 'imperial'] &&
+        data.careSummary is string && data.careSummary.size() <= 4000 &&
+        data.learningCount is int && data.learningCount >= 0 && data.learningCount <= 1000000 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPatientPrivateInfo(data, userId) {
+      return data.keys().hasAll(['userId', 'email', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'email', 'createdAt', 'updatedAt']) &&
+        data.userId is string && data.userId == userId && isValidId(data.userId) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidLearnedMemory(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'category', 'title', 'detail', 'source',
+          'confidence', 'status', 'reinforcementCount', 'evidenceQuote',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId', 'category', 'title', 'detail', 'source',
+          'confidence', 'status', 'reinforcementCount', 'evidenceQuote',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.userId is string && data.userId == userId && isValidId(data.userId) &&
+        data.category is string && data.category in ['condition', 'medication', 'allergy', 'trigger', 'lifestyle', 'preference', 'goal'] &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+        data.detail is string && data.detail.size() >= 1 && data.detail.size() <= 1000 &&
+        data.source is string && data.source in ['auto_learned', 'feedback_rule', 'user_taught', 'pattern_synthesis'] &&
+        data.confidence is string && data.confidence in ['high', 'medium', 'verified'] &&
+        data.status is string && data.status in ['active', 'archived'] &&
+        data.reinforcementCount is int && data.reinforcementCount >= 1 && data.reinforcementCount <= 10000 &&
+        data.evidenceQuote is string && data.evidenceQuote.size() <= 400 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidConsultation(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'title', 'focusArea', 'status',
+          'messageCount', 'lastMessagePreview', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId', 'title', 'focusArea', 'status',
+          'messageCount', 'lastMessagePreview', 'createdAt', 'updatedAt'
+        ]) &&
+        data.userId is string && data.userId == userId && isValidId(data.userId) &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+        data.focusArea is string && data.focusArea.size() <= 80 &&
+        data.status is string && data.status in ['active', 'resolved'] &&
+        data.messageCount is int && data.messageCount >= 0 && data.messageCount <= 10000 &&
+        data.lastMessagePreview is string && data.lastMessagePreview.size() <= 240 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidConsultationMessage(data, userId, consultationId) {
+      return data.keys().hasAll([
+          'userId', 'consultationId', 'role', 'content', 'triageUrgency',
+          'referencedMemoryIds', 'learnedMemoryIds', 'feedbackRating',
+          'feedbackNote', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId', 'consultationId', 'role', 'content', 'triageUrgency',
+          'referencedMemoryIds', 'learnedMemoryIds', 'feedbackRating',
+          'feedbackNote', 'createdAt'
+        ]) &&
+        data.userId is string && data.userId == userId && isValidId(data.userId) &&
+        data.consultationId is string && data.consultationId == consultationId && isValidId(data.consultationId) &&
+        data.role is string && data.role in ['user', 'assistant'] &&
+        data.content is string && data.content.size() >= 1 && data.content.size() <= 12000 &&
+        data.triageUrgency is string && data.triageUrgency in ['none', 'routine', 'monitor', 'prompt_care', 'urgent'] &&
+        isValidStringArray(data.referencedMemoryIds, 20) &&
+        isValidStringArray(data.learnedMemoryIds, 20) &&
+        data.feedbackRating is string && data.feedbackRating in ['none', 'helpful', 'corrected', 'inaccurate'] &&
+        data.feedbackNote is string && data.feedbackNote.size() <= 600 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidSymptomLog(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'symptom', 'severity', 'sleepHours',
+          'triggers', 'notes', 'loggedDate', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId', 'symptom', 'severity', 'sleepHours',
+          'triggers', 'notes', 'loggedDate', 'createdAt'
+        ]) &&
+        data.userId is string && data.userId == userId && isValidId(data.userId) &&
+        data.symptom is string && data.symptom.size() >= 1 && data.symptom.size() <= 160 &&
+        data.severity is int && data.severity >= 1 && data.severity <= 10 &&
+        (data.sleepHours is int || data.sleepHours is float) && data.sleepHours >= 0 && data.sleepHours <= 24 &&
+        data.triggers is string && data.triggers.size() <= 400 &&
+        data.notes is string && data.notes.size() <= 1000 &&
+        data.loggedDate is string && data.loggedDate.size() == 10 && data.loggedDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidFeedbackEvent(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'consultationId', 'messageId', 'rating',
+          'userCorrection', 'distilledRule', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId', 'consultationId', 'messageId', 'rating',
+          'userCorrection', 'distilledRule', 'createdAt'
+        ]) &&
+        data.userId is string && data.userId == userId && isValidId(data.userId) &&
+        data.consultationId is string && isValidId(data.consultationId) &&
+        data.messageId is string && isValidId(data.messageId) &&
+        data.rating is string && data.rating in ['helpful', 'corrected', 'inaccurate'] &&
+        data.userCorrection is string && data.userCorrection.size() <= 1000 &&
+        data.distilledRule is string && data.distilledRule.size() <= 500 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidCitationList(arr) {
+      return arr is list &&
+        arr.size() <= 24 &&
+        (
+          arr.size() == 0 ||
+          (
+            arr[0] is map &&
+            arr[0].keys().hasAll(['index', 'title', 'url', 'sourceType', 'snippet']) &&
+            arr[0].keys().hasOnly(['index', 'title', 'url', 'sourceType', 'snippet']) &&
+            arr[0].index is int &&
+            arr[0].title is string && arr[0].title.size() <= 300 &&
+            arr[0].url is string && arr[0].url.size() <= 1000 &&
+            arr[0].sourceType is string && arr[0].sourceType in ['google_search', 'wikipedia', 'pubmed', 'url_context'] &&
+            arr[0].snippet is string && arr[0].snippet.size() <= 1000
+          )
+        );
+    }
+
+    function isValidNodeSummaryList(arr) {
+      return arr is list &&
+        arr.size() <= 8 &&
+        (
+          arr.size() == 0 ||
+          (
+            arr[0] is map &&
+            arr[0].keys().hasAll(['nodeId', 'label', 'status', 'latencyMs', 'resultCount', 'queryUsed', 'summary']) &&
+            arr[0].keys().hasOnly(['nodeId', 'label', 'status', 'latencyMs', 'resultCount', 'queryUsed', 'summary']) &&
+            arr[0].nodeId is string && arr[0].nodeId.size() <= 64 &&
+            arr[0].label is string && arr[0].label.size() <= 120 &&
+            arr[0].status is string && arr[0].status in ['completed', 'skipped', 'error'] &&
+            arr[0].latencyMs is int && arr[0].latencyMs >= 0 &&
+            arr[0].resultCount is int && arr[0].resultCount >= 0 &&
+            arr[0].queryUsed is string && arr[0].queryUsed.size() <= 400 &&
+            arr[0].summary is string && arr[0].summary.size() <= 600
+          )
+        );
+    }
+
+    function isValidResearchRun(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'query', 'urls', 'activeSources', 'synthesizedAnswer',
+          'citations', 'nodeSummaries', 'savedToMemory', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId', 'query', 'urls', 'activeSources', 'synthesizedAnswer',
+          'citations', 'nodeSummaries', 'savedToMemory', 'createdAt'
+        ]) &&
+        data.userId is string && data.userId == userId && isValidId(data.userId) &&
+        data.query is string && data.query.size() >= 1 && data.query.size() <= 1000 &&
+        data.urls is list && data.urls.size() <= 5 &&
+        (data.urls.size() == 0 || (data.urls[0] is string && data.urls[0].size() <= 500)) &&
+        data.activeSources is list && data.activeSources.size() <= 4 &&
+        (data.activeSources.size() == 0 || (data.activeSources[0] is string && data.activeSources[0].size() <= 32)) &&
+        data.synthesizedAnswer is string && data.synthesizedAnswer.size() >= 1 && data.synthesizedAnswer.size() <= 14000 &&
+        isValidCitationList(data.citations) &&
+        isValidNodeSummaryList(data.nodeSummaries) &&
+        data.savedToMemory is bool &&
+        data.createdAt is timestamp;
+    }
+
+    // Patient Profile
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create: if isValidId(userId) && isOwner(userId) &&
+        isValidPatientProfile(incoming(), userId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(userId) && isOwner(userId) &&
+        isValidPatientProfile(incoming(), userId) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'communicationStyle', 'preferredUnits', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['careSummary', 'learningCount', 'updatedAt'])
+        );
+      allow delete: if false;
+
+      // Isolated Private PII
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && docId == 'info' && isOwner(userId);
+        allow list: if false;
+        allow create: if isValidId(userId) && isValidId(docId) && docId == 'info' && isOwner(userId) &&
+          isValidPatientPrivateInfo(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(docId) && docId == 'info' && isOwner(userId) &&
+          isValidPatientPrivateInfo(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['email', 'updatedAt']);
+        allow delete: if false;
+      }
+
+      // Learned Clinical Memories
+      match /memories/{memoryId} {
+        allow get: if isValidId(userId) && isValidId(memoryId) && isOwner(userId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(memoryId) && isOwner(userId) &&
+          isValidLearnedMemory(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(memoryId) && isOwner(userId) &&
+          isValidLearnedMemory(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['title', 'detail', 'category', 'confidence', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['detail', 'confidence', 'reinforcementCount', 'evidenceQuote', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          );
+        allow delete: if isValidId(userId) && isValidId(memoryId) && isOwner(userId);
+      }
+
+      // Clinical Consultations
+      match /consultations/{consultationId} {
+        allow get: if isValidId(userId) && isValidId(consultationId) && isOwner(userId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(consultationId) && isOwner(userId) &&
+          isValidConsultation(incoming(), userId) &&
+          incoming().status == 'active' &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(consultationId) && isOwner(userId) &&
+          isValidConsultation(incoming(), userId) &&
+          existing().status == 'active' &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['title', 'focusArea', 'messageCount', 'lastMessagePreview', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          );
+        allow delete: if isValidId(userId) && isValidId(consultationId) && isOwner(userId);
+
+        // Consultation Messages (Master Gate checks parent Consultation)
+        match /messages/{messageId} {
+          allow get: if isValidId(userId) && isValidId(consultationId) && isValidId(messageId) && isOwner(userId) &&
+            exists(/databases/$(database)/documents/users/$(userId)/consultations/$(consultationId)) &&
+            get(/databases/$(database)/documents/users/$(userId)/consultations/$(consultationId)).data.userId == request.auth.uid;
+          allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+          allow create: if isValidId(userId) && isValidId(consultationId) && isValidId(messageId) && isOwner(userId) &&
+            isValidConsultationMessage(incoming(), userId, consultationId) &&
+            incoming().createdAt == request.time &&
+            exists(/databases/$(database)/documents/users/$(userId)/consultations/$(consultationId)) &&
+            get(/databases/$(database)/documents/users/$(userId)/consultations/$(consultationId)).data.userId == request.auth.uid &&
+            get(/databases/$(database)/documents/users/$(userId)/consultations/$(consultationId)).data.status == 'active';
+          allow update: if isValidId(userId) && isValidId(consultationId) && isValidId(messageId) && isOwner(userId) &&
+            isValidConsultationMessage(incoming(), userId, consultationId) &&
+            existing().role == 'assistant' &&
+            incoming().userId == existing().userId &&
+            incoming().consultationId == existing().consultationId &&
+            incoming().role == existing().role &&
+            incoming().content == existing().content &&
+            incoming().triageUrgency == existing().triageUrgency &&
+            incoming().referencedMemoryIds == existing().referencedMemoryIds &&
+            incoming().learnedMemoryIds == existing().learnedMemoryIds &&
+            incoming().createdAt == existing().createdAt &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['feedbackRating', 'feedbackNote']) &&
+            exists(/databases/$(database)/documents/users/$(userId)/consultations/$(consultationId)) &&
+            get(/databases/$(database)/documents/users/$(userId)/consultations/$(consultationId)).data.userId == request.auth.uid;
+          allow delete: if isValidId(userId) && isValidId(consultationId) && isValidId(messageId) && isOwner(userId);
+        }
+      }
+
+      // Symptom & Biometric Check-ins
+      match /symptomLogs/{logId} {
+        allow get: if isValidId(userId) && isValidId(logId) && isOwner(userId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(logId) && isOwner(userId) &&
+          isValidSymptomLog(incoming(), userId) &&
+          incoming().createdAt == request.time;
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(logId) && isOwner(userId);
+      }
+
+      // Feedback & Learning Rule Audit Events
+      match /feedbackEvents/{feedbackId} {
+        allow get: if isValidId(userId) && isValidId(feedbackId) && isOwner(userId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(feedbackId) && isOwner(userId) &&
+          isValidFeedbackEvent(incoming(), userId) &&
+          incoming().createdAt == request.time;
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(feedbackId) && isOwner(userId);
+      }
+
+      // Multi-Agent Research Runs
+      match /researchRuns/{runId} {
+        allow get: if isValidId(userId) && isValidId(runId) && isOwner(userId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(runId) && isOwner(userId) &&
+          isValidResearchRun(incoming(), userId) &&
+          incoming().createdAt == request.time;
+        allow update: if isValidId(userId) && isValidId(runId) && isOwner(userId) &&
+          isValidResearchRun(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().query == existing().query &&
+          incoming().urls == existing().urls &&
+          incoming().activeSources == existing().activeSources &&
+          incoming().synthesizedAnswer == existing().synthesizedAnswer &&
+          incoming().citations == existing().citations &&
+          incoming().nodeSummaries == existing().nodeSummaries &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['savedToMemory']);
+        allow delete: if isValidId(userId) && isValidId(runId) && isOwner(userId);
+      }
+    }
+  }
+}

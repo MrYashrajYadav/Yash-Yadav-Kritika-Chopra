@@ -1,0 +1,468 @@
+{
+  "entities": {
+    "PatientProfile": {
+      "title": "PatientProfile",
+      "description": "Authenticated user's clinical agent preferences and synthesized care overview.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "communicationStyle": {
+          "type": "string",
+          "enum": ["concise", "detailed", "plain_language", "clinical"],
+          "maxLength": 32
+        },
+        "preferredUnits": {
+          "type": "string",
+          "enum": ["metric", "imperial"],
+          "maxLength": 16
+        },
+        "careSummary": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "learningCount": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "communicationStyle",
+        "preferredUnits",
+        "careSummary",
+        "learningCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PatientPrivateInfo": {
+      "title": "PatientPrivateInfo",
+      "description": "Isolated PII document storing user email strictly accessible by owner.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 254
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "email", "createdAt", "updatedAt"]
+    },
+    "LearnedMemory": {
+      "title": "LearnedMemory",
+      "description": "Persistent health fact, preference, trigger, or care rule learned by the AI agent.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "condition",
+            "medication",
+            "allergy",
+            "trigger",
+            "lifestyle",
+            "preference",
+            "goal"
+          ],
+          "maxLength": 32
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "auto_learned",
+            "feedback_rule",
+            "user_taught",
+            "pattern_synthesis"
+          ],
+          "maxLength": 32
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["high", "medium", "verified"],
+          "maxLength": 16
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "archived"],
+          "maxLength": 16
+        },
+        "reinforcementCount": {
+          "type": "integer"
+        },
+        "evidenceQuote": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "category",
+        "title",
+        "detail",
+        "source",
+        "confidence",
+        "status",
+        "reinforcementCount",
+        "evidenceQuote",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Consultation": {
+      "title": "Consultation",
+      "description": "Clinical consultation session thread with the healthcare AI agent.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "focusArea": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "resolved"],
+          "maxLength": 16
+        },
+        "messageCount": {
+          "type": "integer"
+        },
+        "lastMessagePreview": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "focusArea",
+        "status",
+        "messageCount",
+        "lastMessagePreview",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ConsultationMessage": {
+      "title": "ConsultationMessage",
+      "description": "Individual turn in a consultation with memory provenance and feedback state.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "consultationId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "assistant"],
+          "maxLength": 16
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12000
+        },
+        "triageUrgency": {
+          "type": "string",
+          "enum": ["none", "routine", "monitor", "prompt_care", "urgent"],
+          "maxLength": 20
+        },
+        "referencedMemoryIds": {
+          "type": "array",
+          "description": "IDs of learned memories applied when generating this reply."
+        },
+        "learnedMemoryIds": {
+          "type": "array",
+          "description": "IDs of memories created or reinforced by this turn."
+        },
+        "feedbackRating": {
+          "type": "string",
+          "enum": ["none", "helpful", "corrected", "inaccurate"],
+          "maxLength": 20
+        },
+        "feedbackNote": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "consultationId",
+        "role",
+        "content",
+        "triageUrgency",
+        "referencedMemoryIds",
+        "learnedMemoryIds",
+        "feedbackRating",
+        "feedbackNote",
+        "createdAt"
+      ]
+    },
+    "SymptomLog": {
+      "title": "SymptomLog",
+      "description": "Structured daily symptom and biometric check-in used for pattern learning.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "symptom": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "severity": {
+          "type": "integer"
+        },
+        "sleepHours": {
+          "type": "number"
+        },
+        "triggers": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "loggedDate": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "maxLength": 10
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "symptom",
+        "severity",
+        "sleepHours",
+        "triggers",
+        "notes",
+        "loggedDate",
+        "createdAt"
+      ]
+    },
+    "FeedbackEvent": {
+      "title": "FeedbackEvent",
+      "description": "Audit log of user corrections and distilled behavioral rules learned by the agent.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "consultationId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "messageId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "rating": {
+          "type": "string",
+          "enum": ["helpful", "corrected", "inaccurate"],
+          "maxLength": 20
+        },
+        "userCorrection": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "distilledRule": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "consultationId",
+        "messageId",
+        "rating",
+        "userCorrection",
+        "distilledRule",
+        "createdAt"
+      ]
+    },
+    "ResearchRun": {
+      "title": "ResearchRun",
+      "description": "Persisted multi-agent healthcare search run across Google Web, Wikipedia, PubMed, and webpage URLs.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "urls": {
+          "type": "array",
+          "description": "Optional specific medical webpage URLs provided by user."
+        },
+        "activeSources": {
+          "type": "array",
+          "description": "Enabled search agent IDs for this run."
+        },
+        "synthesizedAnswer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 14000
+        },
+        "citations": {
+          "type": "array",
+          "description": "Bounded list of verified source citations."
+        },
+        "nodeSummaries": {
+          "type": "array",
+          "description": "Bounded list of per-node execution summaries."
+        },
+        "savedToMemory": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "query",
+        "urls",
+        "activeSources",
+        "synthesizedAnswer",
+        "citations",
+        "nodeSummaries",
+        "savedToMemory",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/PatientProfile" },
+      "description": "Owner-only clinical profile and adaptive learning preferences."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/PatientPrivateInfo" },
+      "description": "Owner-only isolated PII document (docId: info)."
+    },
+    "/users/{userId}/memories/{memoryId}": {
+      "schema": { "$ref": "#/entities/LearnedMemory" },
+      "description": "Owner-only persistent health memories and care rules."
+    },
+    "/users/{userId}/consultations/{consultationId}": {
+      "schema": { "$ref": "#/entities/Consultation" },
+      "description": "Owner-only consultation threads."
+    },
+    "/users/{userId}/consultations/{consultationId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ConsultationMessage" },
+      "description": "Owner-only consultation message turns."
+    },
+    "/users/{userId}/symptomLogs/{logId}": {
+      "schema": { "$ref": "#/entities/SymptomLog" },
+      "description": "Owner-only structured symptom and sleep check-ins."
+    },
+    "/users/{userId}/feedbackEvents/{feedbackId}": {
+      "schema": { "$ref": "#/entities/FeedbackEvent" },
+      "description": "Owner-only feedback and distilled learning rule events."
+    },
+    "/users/{userId}/researchRuns/{runId}": {
+      "schema": { "$ref": "#/entities/ResearchRun" },
+      "description": "Owner-only multi-agent healthcare search history."
+    }
+  }
+}

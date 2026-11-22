@@ -1,0 +1,6 @@
+{
+  "name": "Meridian Care",
+  "description": "Adaptive healthcare AI agent that learns your health profile, symptom patterns, and clinical communication preferences over time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
